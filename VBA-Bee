@@ -1,0 +1,319 @@
+Sub Bee()
+
+'Allows for faster computing by not having the computer show you all that is happening
+Application.ScreenUpdating = False
+
+'Takes original data and copies it to another worksheet, from which it works with from now on
+Sheets.Add
+Worksheets(2).Copy After:=Worksheets(1)
+Sheets(1).Select
+Application.DisplayAlerts = False
+ActiveWindow.SelectedSheets.Delete
+Application.DisplayAlerts = True
+Sheets(2).Name = "Raw Data"
+Sheets(1).Name = "Final"
+
+'Deletes all unnecessary columns
+'Duplicates Time Column
+Columns("A:A").Select
+Selection.Delete Shift:=xlToLeft
+Selection.Delete Shift:=xlToLeft
+Selection.Delete Shift:=xlToLeft
+Columns("B:B").Select
+Selection.Delete Shift:=xlToLeft
+Columns("D:D").Select
+Selection.Delete Shift:=xlToLeft
+Selection.Delete Shift:=xlToLeft
+Columns("A:A").Select
+Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+Columns("B:B").Select
+Selection.Copy
+Columns("A:A").Select
+ActiveSheet.Paste
+    
+'Renames columns
+Range("A1").Select
+ActiveCell.FormulaR1C1 = "Date"
+Range("B1").Select
+ActiveCell.FormulaR1C1 = "Time"
+Range("C1").Select
+ActiveCell.FormulaR1C1 = "Reader"
+Range("D1").Select
+ActiveCell.FormulaR1C1 = "Tag ID"
+'Range("E1").Select
+'ActiveCell.FormulaR1C1 = "Direction"
+'Range("F1").Select
+'ActiveCell.FormulaR1C1 = "Duration"
+
+
+Dim i As Integer
+i = 2
+Do While Cells(i, 1).Value <> ""
+    'Takes first column, removes time, and formats date
+    Dim formattedDate As String
+    formattedDate = Cells(i, 1).Text
+    formattedDate = Left(formattedDate, 10)
+    Cells(i, 1).Value = formattedDate
+    Cells(i, 1).Select
+    Selection.NumberFormat = "mm/dd/yy"
+    
+    'Takes second column, removes date, and formats time
+    Dim y As Double, formattedTime As String
+    formattedTime = Cells(i, 2).Text
+    formattedTime = Mid(formattedTime, 12, 12)
+    Cells(i, 2).Value = formattedTime
+    Cells(i, 2).Select
+    Selection.NumberFormat = "hh:mm:ss"
+    Selection.Copy
+    Application.CutCopyMode = False
+    ActiveSheet.Paste
+    formattedTime = Cells(i, 2).Text
+    y = TimeValue(formattedTime)
+        
+    'Subtracts 6 hours from original time (Excel converts time into a number between 0 and 1: .25 = 6 hours)
+    'If time is between 12 AM - 6 AM, the date must be subtracted by one day
+    Dim firstDate As Date, secondDate As Date
+    firstDate = DateValue(formattedDate)
+        If y <= 0.25 Then
+            secondDate = DateAdd("d", -1, firstDate)
+            Cells(i, 1).Value = secondDate
+            y = y + 0.75
+        Else
+            y = TimeValue(formattedTime) - 0.25
+            Cells(i, 1).Value = firstDate
+        End If
+    Cells(i, 2).Value = y
+
+    'Shorten Tag ID to 4 characters
+    Dim TagID As String
+    TagID = Cells(i, 4).Text
+    TagID = Left(TagID, 5)
+    Cells(i, 4).Value = TagID
+    
+    i = i + 1
+Loop
+
+'Centers text
+Columns("A:E").Select
+Application.CutCopyMode = False
+With Selection
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlBottom
+    .WrapText = False
+    .Orientation = 0
+    .AddIndent = False
+    .ShrinkToFit = False
+    .MergeCells = False
+End With
+
+'Autofits columns
+Columns("A:A").EntireColumn.AutoFit
+Columns("B:B").EntireColumn.AutoFit
+Columns("C:C").EntireColumn.AutoFit
+Columns("D:D").EntireColumn.AutoFit
+Columns("E:E").EntireColumn.AutoFit
+'Columns("F:F").EntireColumn.AutoFit
+    
+'Creates a list of the Tag IDs used in the data
+Cells(1, 6).Value = Cells(2, 4).Value
+Dim numbers() As String, size As Integer, count As Integer 'number() is an array of continuously incremented size
+Dim x As Integer, q As Integer, z As Integer
+x = 3
+Do While Cells(x, 4).Value <> ""
+    count = 0
+    size = WorksheetFunction.CountA(Worksheets(1).Columns(6))
+    For q = 1 To size
+        If Cells(x, 4).Value <> Cells(q, 6).Value Then
+            count = count + 1
+        End If
+    Next q
+    If count = size Then
+        Cells(size + 1, 6).Value = Cells(x, 4).Value
+    End If
+    x = x + 1
+Loop
+
+'Puts each Tag ID in an array
+'ReDim allows for redimensioning the array and Preserve maintains the contents
+ReDim Preserve numbers(size)
+For z = 1 To size
+    numbers(z) = Cells(z, 6).Value
+Next z
+
+'Creates an adjacent table to the right of the data, only containing a specific Tag ID
+'In chronological order
+Dim count2 As Integer, x2 As Integer, q2 As Integer
+Dim count3 As Integer, x3 As Integer, q3 As Integer
+    For count2 = 1 To size
+        q2 = 2
+        x2 = 2
+ 
+        Range(Cells(x2 - 1, 1), Cells(x2 - 1, 4)).Select
+        Selection.Copy
+        Cells(q2 - 1, 8 + 7 * (count2 - 1)).Select
+        ActiveSheet.Paste
+        
+        'Format Table Title
+        Selection.Font.Bold = True
+        Selection.Interior.ColorIndex = 39
+        
+        'Creates contents of tables and separates the tables by Tag ID
+        Do While Cells(x2, 4).Value <> ""
+            If numbers(count2) = Cells(x2, 4).Value Then
+                Range(Cells(x2, 1), Cells(x2, 4)).Select
+                Selection.Copy
+                Cells(q2, 8 + 7 * (count2 - 1)).Select
+                ActiveSheet.Paste
+                q2 = q2 + 1
+                             
+                'Format Tables
+                Dim tableDay As Integer
+                tableDay = CInt(Mid(Cells(x2, 1), 3, 2))
+                If tableDay Mod 2 = 0 Then
+                    Selection.Interior.ColorIndex = 6
+                Else
+                    Selection.Interior.ColorIndex = 44
+                End If
+                Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+                Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+                Selection.Borders(xlEdgeLeft).LineStyle = xlNone
+                If q2 - 1 = 2 Then
+                    With Selection.Borders(xlEdgeTop)
+                        .LineStyle = xlContinuous
+                        .Weight = xlThin
+                    End With
+                Else
+                    Selection.Borders(xlEdgeTop).LineStyle = xlNone
+                End If
+                Selection.Borders(xlEdgeBottom).LineStyle = xlNone
+                Selection.Borders(xlEdgeRight).LineStyle = xlNone
+                Selection.Borders(xlInsideVertical).LineStyle = xlNone
+                Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+                
+            End If
+            x2 = x2 + 1
+        Loop
+        
+        'Creates another table that consists of removed duplicate readings and ranged time
+        x3 = 2
+        Range(Cells(1, 8 + 7 * (count2 - 1)), Cells(1, 8 + 7 * (count2 - 1) + 3)).Select
+        Selection.Copy
+        Cells(q2 + 1, 8 + 7 * (count2 - 1)).Select
+        ActiveSheet.Paste
+        Cells(q2 + 1, 8 + 7 * (count2 - 1)).Select
+        Selection.Copy
+        Cells(q2 + 1, 12 + 7 * (count2 - 1)).Select
+        ActiveSheet.Paste
+        ActiveCell.FormulaR1C1 = "Direction"
+        Range(Cells(q2 + 1, 8 + 7 * (count2 - 1)), Cells(q2 + 1, 12 + 7 * (count2 - 1))).Select
+        Selection.Interior.ColorIndex = 39
+        Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+        Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+        Selection.Borders(xlEdgeLeft).LineStyle = xlNone
+            With Selection.Borders(xlEdgeBottom)
+                .LineStyle = xlContinuous
+                .Weight = xlThin
+            End With
+        Selection.Borders(xlEdgeTop).LineStyle = xlNone
+        Selection.Borders(xlEdgeRight).LineStyle = xlNone
+        Selection.Borders(xlInsideVertical).LineStyle = xlNone
+        Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+        
+        'Removes duplicate readings
+        Do While Cells(x3, 8 + 7 * (count2 - 1)).Value <> ""
+            Range(Cells(x3, 8 + 7 * (count2 - 1)), Cells(x3, 8 + 7 * (count2 - 1) + 3)).Select
+            Selection.Copy
+            Cells(q2 + 2, 8 + 7 * (count2 - 1)).Select
+            ActiveSheet.Paste
+            If Selection.Interior.ColorIndex = 6 Then
+                Selection.Interior.ColorIndex = 38
+            Else
+                Selection.Interior.ColorIndex = 17
+            End If
+            If Cells(x3 + 1, 9 + 7 * (count2 - 1)).Value = Cells(x3, 9 + 7 * (count2 - 1)).Value Then
+                Range(Cells(q2 + 2, 8 + 7 * (count2 - 1)), Cells(q2 + 2, 8 + 7 * (count2 - 1) + 3)).Select
+                Selection.Delete
+                q2 = q2 - 1
+            End If
+            q2 = q2 + 1
+            x3 = x3 + 1
+        Loop
+        
+        'Removes ranged time
+        q2 = q2 + 1
+        Do While Cells(q2, 8 + 7 * (count2 - 1)).Value <> ""
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = Cells(q2 - 1, 10 + 7 * (count2 - 1)).Value Then
+                    Dim firstMinute As Double, secondMinute As Double
+                    firstMinute = Cells(q2 - 1, 9 + 7 * (count2 - 1))
+                    secondMinute = Cells(q2, 9 + 7 * (count2 - 1))
+                    If secondMinute - firstMinute < (2 / 86400) Then
+                            Range(Cells(q2, 8 + 7 * (count2 - 1)), Cells(q2, 8 + 7 * (count2 - 1) + 3)).Select
+                            Selection.Delete
+                    End If
+                End If
+        q2 = q2 - 1
+        Loop
+        
+        Dim string1 As String, string2 As String
+        string1 = "out"
+        string2 = "in"
+        q2 = q2 + 2
+        Do While Cells(q2, 10 + 7 * (count2 - 1)).Value <> ""
+            Cells(q2, 10 + 7 * (count2 - 1)).Select
+            Selection.Copy
+            Cells(q2, 12 + 7 * (count2 - 1)).Select
+            ActiveSheet.Paste
+            Selection.Value = ""
+            If Cells(q2, 10 + 7 * (count2 - 1)).Value + Cells(q2 + 1, 10 + 7 * (count2 - 1)).Value = 10 Then
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 4 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string1
+                End If
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 6 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string2
+                End If
+            End If
+            If Cells(q2, 10 + 7 * (count2 - 1)).Value + Cells(q2 + 1, 10 + 7 * (count2 - 1)).Value = 4 Then
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 1 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string1
+                End If
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 3 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string2
+                End If
+            End If
+            If Cells(q2, 10 + 7 * (count2 - 1)).Value + Cells(q2 + 1, 10 + 7 * (count2 - 1)).Value = 13 Then
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 8 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string1
+                End If
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 5 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string2
+                End If
+            End If
+            If Cells(q2, 10 + 7 * (count2 - 1)).Value + Cells(q2 + 1, 10 + 7 * (count2 - 1)).Value = 9 Then
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 7 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string1
+                End If
+                If Cells(q2, 10 + 7 * (count2 - 1)).Value = 2 Then
+                    Cells(q2, 12 + 7 * (count2 - 1)).Value = string2
+                End If
+            End If
+        
+        q2 = q2 + 1
+        Loop
+        
+    Next count2
+
+''Code for determining duration
+'Dim duration As Double
+'duration = Cells(10, 7).Value - Cells(10, 6).Value
+''Cells(2, 6).Value = duration
+'Cells(1, 6).Value = duration
+'Cells(1, 6).Select
+'Selection.NumberFormat = "hh:mm:ss;@"
+    
+Application.ScreenUpdating = True
+
+'ActiveWorkbook.SaveAs ("Macintosh HD:Users:marloudeguzman:Desktop:" & Format(Now(), "MMM-DD-YYYY hh mm AMPM") & ".xlsm")
+
+End Sub
+
+
